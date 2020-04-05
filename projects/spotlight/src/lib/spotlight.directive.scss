@@ -1,0 +1,18 @@
+.spotlight {
+  &__backdrop {
+    position: fixed;
+    z-index: 950;
+
+    display: block;
+
+    background-color: var(
+      --color__spotlight-backdrop_background,
+      rgba(52, 74, 94, 0.5)
+    );
+  }
+
+  &__cover {
+    position: fixed;
+    z-index: 990;
+  }
+}
