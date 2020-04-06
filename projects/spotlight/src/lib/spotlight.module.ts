@@ -21,4 +21,4 @@ import { SpotlightDirective } from './spotlight.directive';
   imports: [CommonModule],
   exports: [SpotlightDirective]
 })
-export class SpotlightModule { }
+export class NgxSpotlightModule { }

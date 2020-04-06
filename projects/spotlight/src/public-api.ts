@@ -3,5 +3,5 @@
  */
 
 export * from './lib/spotlight.service';
-export * from './lib/spotlight.component';
+export * from './lib/spotlight.directive';
 export * from './lib/spotlight.module';

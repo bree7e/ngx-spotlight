@@ -1,4 +1,3 @@
-import { DOCUMENT } from '@angular/common';
 import {
   Directive,
   ElementRef,
@@ -12,14 +11,13 @@ import {
   Renderer2,
 } from '@angular/core';
 
-// import { WINDOW, WindowWrapper } from '@ngispui/window-service/window.service';
 import { WINDOW } from 'ngx-window-token';
 import { untilDestroyed } from 'ngx-take-until-destroy';
 import { fromEvent, merge } from 'rxjs';
 
 import { SpotlightService } from './spotlight.service';
 
-/** all 4 sides of the cuboid */
+/** all 4 sides */
 type Side = 'top' | 'bottom' | 'left' | 'right';
 
 /** setStyles method properties */
@@ -65,7 +63,6 @@ export class SpotlightDirective implements OnInit, OnDestroy {
 
   constructor(
     private _spotlightService: SpotlightService,
-    @Inject(DOCUMENT) private _document: Document,
     @Inject(WINDOW) private _window: Window,
     public readonly elementRef: ElementRef<HTMLElement>,
     private _renderer: Renderer2,
@@ -161,7 +158,7 @@ export class SpotlightDirective implements OnInit, OnDestroy {
       backdropPiece.dataset.side = side;
       this._modifyBackdropPieceStyle(backdropPiece);
       this._layerSet.add(backdropPiece);
-      this._renderer.appendChild(this._document.body, backdropPiece);
+      this._renderer.appendChild(this._window.document.body, backdropPiece);
     }
   }
 
