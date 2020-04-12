@@ -11,6 +11,7 @@ import { WINDOW } from 'ngx-window-token';
 export class AppComponent {
   title = 'demo';
   info = '';
+  console = console;
 
   constructor(@Inject(WINDOW) _window: Window) {
     this.info = _window.navigator.userAgent;

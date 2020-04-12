@@ -10,11 +10,11 @@ import { SpotlightDirective } from './spotlight.directive';
  *
  * Usage:
  * ```html
- * <vepp-ssl-widget veppOnboarding="site/ssl"></vepp-ssl-widget>
+ * <some-component ngxSpotlight="site/ssl"></some-component>
  * ```
  * When the hint is opened the service picks the element with this directive
- * and calls the `showOverlay()` method inside it. When it've been closed, the service
- * calls `hideOverlay()`
+ * and calls the `show()` method inside it. When it've been closed, the service
+ * calls `hide()`
  */
 @NgModule({
   declarations: [SpotlightDirective],

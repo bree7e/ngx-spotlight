@@ -6,57 +6,65 @@ import {
   Input,
   NgZone,
   OnDestroy,
-  OnInit,
   Output,
   Renderer2,
+  AfterViewInit,
 } from '@angular/core';
 
 import { WINDOW } from 'ngx-window-token';
-import { untilDestroyed } from 'ngx-take-until-destroy';
-import { fromEvent, merge } from 'rxjs';
+import { fromEvent, merge, Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 import { SpotlightService } from './spotlight.service';
 
-/** all 4 sides */
-type Side = 'top' | 'bottom' | 'left' | 'right';
-
-/** setStyles method properties */
-interface SetStyleProps {
-  top?: string | number;
-  bottom?: string | number;
-  left?: string | number;
-  right?: string | number;
-  width?: string | number;
-  height?: string | number;
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+/** all 4 sides + overlay */
+type Piece = 'top' | 'bottom' | 'left' | 'right' | 'overlay';
+type Border = 'border-top' | 'border-bottom' | 'border-left' | 'border-right';
+
 /**
- * Onboarding spotlight directive
+ * Spotlight directive
  *
  * This lets you to spotlight certain elements
  * by placing 4 dark transparent divs around it
- *
- * Usage:
- * ```html
- * <vepp-ssl-widget ngxSpotlight="site/ssl"></vepp-ssl-widget>
- * ```
- *
- * TODO: add optional settings for element like backdrop gap, outlining or a shadow
  */
 @Directive({
   selector: '[ngxSpotlight]',
+  exportAs: 'spotlight',
 })
-export class SpotlightDirective implements OnInit, OnDestroy {
-  /** overlay click event */
-  @Output() overlayClick = new EventEmitter<void>();
+export class SpotlightDirective implements AfterViewInit, OnDestroy {
   /** onboarding tip id */
-  @Input('ngxSpotlight') public id: string;
+  @Input('ngxSpotlight') id = 'spotlight_at_' + Date.now();
+  /** draw border around spotlight element */
+  @Input() border = false;
+  /** draw transparent overlay on spotlight element */
+  @Input() overlay = false;
+  /** show overlay after view init */
+  @Input() auto = false;
+  /** backdrop and overlay click event */
+  @Output() spotlightClick = new EventEmitter<{
+    piece: Piece;
+    mouse: MouseEvent;
+  }>();
+  /** border width */
+  readonly borderWidth = 4;
+  /** gap around spotlight element */
+  readonly gap = 8;
   /** whether the directive is shown */
   private _isShown = false;
-  /** set of all created corresponding elements (backdrops and overlay) */
-  private _layerSet = new Set<HTMLElement>();
+  /** whether the spotlight is shown */
+  get isShown(): boolean {
+    return this._isShown;
+  }
+  /** destroy subject (pattern) */
+  private readonly _destroy$ = new Subject<void>();
+  /** set of all created corresponding elements (backdrops, borders and overlay) */
+  private readonly _elementMap = new Map<Piece | Border, HTMLElement>();
   /**
-   * set of listeners that should be "unlistened" on destroying
+   * Set of listeners that should be "unlistened" on destroying
    * @see https://angular.io/api/core/Renderer2#listen
    */
   private _listenerSet = new Set<() => void>();
@@ -69,14 +77,33 @@ export class SpotlightDirective implements OnInit, OnDestroy {
     private _zone: NgZone
   ) {}
 
-  ngOnInit(): void {
+  ngAfterViewInit(): void {
     this._spotlightService.register(this.id, this);
+    if (this.auto) {
+      this.show();
+    }
   }
 
-  ngOnDestroy(): void {
-    this._spotlightService.deregister(this.id);
-    this.hideOverlay();
-    this._renderer.destroy();
+  /**
+   * Shows the overlay
+   * - Locks the scrolling for the user
+   * - Scrolls the page to the very top
+   * - Places 4 overlays around the element
+   */
+  public show(): void {
+    if (this._isShown) {
+      return;
+    }
+    this._scrollToTop();
+    this._drawBackdrop();
+    if (this.border) {
+      this._drawBorder();
+    }
+    if (this.overlay) {
+      this._drawOverlay();
+    }
+    this._watchWindowUpdate();
+    this._isShown = true;
   }
 
   /**
@@ -90,18 +117,75 @@ export class SpotlightDirective implements OnInit, OnDestroy {
   }
 
   /**
-   * Watches for window resize and, when it occurs, modifies the layers styles
+   * Places 4 backdrops around the elementRef
    */
-  private _watchWindowResize(): void {
-    const updateBackdropStyles = () => {
-      for (const layer of this._layerSet) {
-        this._modifyBackdropPieceStyle(layer);
+  private _drawBackdrop(): void {
+    for (const side of ['top', 'bottom', 'left', 'right'] as Piece[]) {
+      const backdropEl: HTMLElement = this._renderer.createElement('div');
+      this._renderer.addClass(backdropEl, 'spotlight__backdrop'); // just for show class
+      this._renderer.addClass(backdropEl, `spotlight__backdrop_${side}`); // just for show class
+      this._setStyles(backdropEl, {
+        position: 'fixed',
+        zIndex: '950',
+        display: 'block',
+        backgroundColor: `var(
+          --color__spotlight-backdrop_background,
+          rgba(52, 74, 94, 0.8)
+        )`,
+      });
+      this._modifyPieceStyle(backdropEl, side);
+      this._listenerSet.add(
+        this._renderer.listen(backdropEl, 'click', (event: MouseEvent) => {
+          event.preventDefault();
+          this.spotlightClick.emit({ piece: side, mouse: event });
+        })
+      );
+      this._elementMap.set(side, backdropEl);
+      this._renderer.appendChild(this._window.document.body, backdropEl);
+    }
+  }
+
+  /**
+   * Places 4 div around the spotlight to emulate stroke
+   */
+  private _drawBorder(): void {
+    for (const side of ['top', 'bottom', 'left', 'right'] as Piece[]) {
+      const border = `border-${side}` as Border;
+      const borderEl: HTMLElement = this._renderer.createElement('div');
+      this._renderer.addClass(borderEl, 'spotlight__border'); // just for show class
+      this._renderer.addClass(borderEl, `spotlight__border_${side}`); // just for show class
+      this._setStyles(borderEl, {
+        position: 'fixed',
+        zIndex: '955',
+        pointerEvents: 'none',
+        borderRadius: '20px',
+        display: 'block',
+        borderColor: `var(
+          --color__spotlight-border,
+          #c9c9c9
+        )`,
+        [`border${capitalize(side)}Width`]: this.borderWidth + 'px',
+        [`border${capitalize(side)}Style`]: 'solid',
+      });
+      this._modifyPieceStyle(borderEl, border);
+      this._elementMap.set(border, borderEl);
+      this._renderer.appendChild(this._window.document.body, borderEl);
+    }
+  }
+
+  /**
+   * Watches for window scroll&resize and, when it occurs, modifies the layers styles
+   */
+  private _watchWindowUpdate(): void {
+    const updateBackropAndOverlay = () => {
+      for (const [piece, layer] of this._elementMap) {
+        this._modifyPieceStyle(layer, piece);
       }
     };
     this._zone.runOutsideAngular(() => {
       merge(fromEvent(window, 'scroll'), fromEvent(window, 'resize'))
-        .pipe(untilDestroyed(this))
-        .subscribe(() => updateBackdropStyles());
+        .pipe(takeUntil(this._destroy$))
+        .subscribe(() => updateBackropAndOverlay());
     });
   }
 
@@ -110,7 +194,10 @@ export class SpotlightDirective implements OnInit, OnDestroy {
    * @param element - the element to mutate
    * @param props - the limited set of CSS properties
    */
-  private _setStyles(element: HTMLElement, props: SetStyleProps): void {
+  private _setStyles(
+    element: HTMLElement,
+    props: Partial<CSSStyleDeclaration>
+  ): void {
     for (const prop in props) {
       if (props.hasOwnProperty(prop)) {
         this._renderer.setStyle(element, prop, props[prop]);
@@ -120,57 +207,80 @@ export class SpotlightDirective implements OnInit, OnDestroy {
 
   /**
    * Modifies the given layer's styles **by mutating it**
-   * @param piece - backdrop's layer HTML element
+   * @param el - backdrop's layer HTML element
+   * @param piece - piece of spotlight element
    */
-  private _modifyBackdropPieceStyle(piece: HTMLElement): void {
+  private _modifyPieceStyle(el: HTMLElement, piece: Piece | Border): void {
     const rects = this.elementRef.nativeElement.getBoundingClientRect();
-    const side = piece.dataset.side as Side;
-
-    switch (side) {
+    switch (piece) {
       case 'top':
-        return this._setStyles(piece, { top: 0, left: 0, right: 0, height: `${rects.top}px` });
+        return this._setStyles(el, {
+          top: '0',
+          left: '0',
+          right: '0',
+          height: `${rects.top}px`,
+        });
       case 'bottom':
-        return this._setStyles(piece, { top: `${rects.bottom}px`, left: 0, right: 0, bottom: 0 });
+        return this._setStyles(el, {
+          top: `${rects.bottom}px`,
+          left: '0',
+          right: '0',
+          bottom: '0',
+        });
       case 'left':
-        return this._setStyles(piece, {
+        return this._setStyles(el, {
           top: `${rects.top}px`,
-          left: 0,
+          left: '0',
           width: `${rects.left}px`,
           height: `${rects.height}px`,
         });
       case 'right':
-        return this._setStyles(piece, {
+        return this._setStyles(el, {
           top: `${rects.top}px`,
           left: `${rects.right}px`,
-          right: 0,
+          right: '0',
           height: `${rects.height}px`,
         });
-    }
-  }
-
-  /**
-   * Places 4 backdrops around the elementRef
-   */
-  private _drawBackdrop(): void {
-    for (const side of ['top', 'bottom', 'left', 'right'] as Side[]) {
-      const backdropPiece: HTMLElement = this._renderer.createElement('div');
-      this._renderer.addClass(backdropPiece, 'spotlight__backdrop');
-      backdropPiece.dataset.side = side;
-      this._modifyBackdropPieceStyle(backdropPiece);
-      this._layerSet.add(backdropPiece);
-      this._renderer.appendChild(this._window.document.body, backdropPiece);
-    }
-  }
-
-  /**
-   * Removes the backdrop and the overlay elements from the DOM
-   */
-  private _removeLayers(): void {
-    for (const removeListener of this._listenerSet) {
-      removeListener();
-    }
-    for (const layer of this._layerSet) {
-      layer.remove();
+      case 'overlay':
+        return this._setStyles(el, {
+          left: `${rects.left}px`,
+          top: `${rects.top}px`,
+          width: `${rects.width}px`,
+          height: `${rects.height}px`,
+          position: 'fixed',
+          zIndex: '990',
+        });
+      case 'border-top':
+        return this._setStyles(el, {
+          borderTopStyle: 'solid',
+          top: `${rects.top - this.borderWidth}px`,
+          left: `${rects.left - this.borderWidth}px`,
+          height: `${this.borderWidth}px`,
+          width: `${rects.width + 2 * this.borderWidth}px`,
+        });
+      case 'border-bottom':
+        return this._setStyles(el, {
+          top: `${rects.bottom - this.borderWidth}px`,
+          left: `${rects.left - this.borderWidth}px`,
+          height: `${this.borderWidth}px`,
+          width: `${rects.width + 2 * this.borderWidth}px`,
+        });
+      case 'border-left':
+        return this._setStyles(el, {
+          top: `${rects.top - this.borderWidth}px`,
+          left: `${rects.left - this.borderWidth}px`,
+          height: `${rects.height + 2 * this.borderWidth}px`,
+          width: `${this.borderWidth}px`,
+        });
+      case 'border-right':
+        return this._setStyles(el, {
+          top: `${rects.top - this.borderWidth}px`,
+          left: `${rects.right - this.borderWidth}px`,
+          height: `${rects.height + 2 * this.borderWidth}px`,
+          width: `${this.borderWidth}px`,
+        });
+      default:
+        throw new Error(`Unexpected piece ${piece}`);
     }
   }
 
@@ -178,51 +288,52 @@ export class SpotlightDirective implements OnInit, OnDestroy {
    * Draws an invisible element over the spotlighted element from the DOM
    */
   private _drawOverlay(): void {
-    const overlay = this._renderer.createElement('div');
-    /** the size of the object and the positions of it's edges */
-    const rects = this.elementRef.nativeElement.getBoundingClientRect();
-    this._setStyles(overlay, {
-      left: `${rects.left}px`,
-      top: `${rects.top}px`,
-      width: `${rects.width}px`,
-      height: `${rects.height}px`,
-    });
-    this._renderer.addClass(overlay, 'spotlight__cover');
+    const overlay: HTMLDivElement = this._renderer.createElement('div');
+    this._renderer.addClass(overlay, 'spotlight__cover'); // just for show element
+    this._modifyPieceStyle(overlay, 'overlay');
     this._listenerSet.add(
       this._renderer.listen(overlay, 'click', (event: MouseEvent) => {
         event.preventDefault();
-        // nextHint();
+        this.spotlightClick.emit({ piece: 'overlay', mouse: event });
       })
     );
-    this._watchWindowResize();
-    this._layerSet.add(overlay);
-    this._renderer.appendChild(this.elementRef.nativeElement.parentElement, overlay);
+    this._elementMap.set('overlay', overlay);
+    this._renderer.appendChild(
+      this.elementRef.nativeElement.parentElement,
+      overlay
+    );
   }
 
   /**
-   * Shows the overlay
-   * - Locks the scrolling for the user
-   * - Scrolls the page to the very top
-   * - Places 4 overlays around the element
+   * Removes the spotlight for this element
    */
-  public showOverlay(): void {
-    if (this._isShown) {
-      return;
-    }
-    this._scrollToTop();
-    this._drawBackdrop();
-    this._drawOverlay();
-    this._isShown = true;
-  }
-
-  /**
-   * Removes the overlay for this element
-   */
-  public hideOverlay(): void {
+  public hide(): void {
     if (!this._isShown) {
       return;
     }
-    this._removeLayers();
+    this._removeBackdropAndOverlay();
+    this._destroy$.next();
     this._isShown = false;
+  }
+
+  /**
+   * Removes the backdrop and the overlay elements from the DOM
+   */
+  private _removeBackdropAndOverlay(): void {
+    for (const removeListener of this._listenerSet) {
+      removeListener();
+    }
+    this._listenerSet.clear();
+    for (const layer of this._elementMap.values()) {
+      layer.remove();
+    }
+    this._elementMap.clear();
+  }
+
+  ngOnDestroy(): void {
+    this._destroy$.next();
+    this._destroy$.complete();
+    this.hide();
+    this._spotlightService.deregister(this.id);
   }
 }

@@ -9,8 +9,6 @@ export class SpotlightService {
   /** available spotlights list */
   private _targetMap = new Map<string, SpotlightDirective>();
 
-  constructor() {}
-
   /**
    * Registers the spotlight directive into the service
    * @param id - spotlight id
@@ -21,6 +19,21 @@ export class SpotlightService {
       throw new Error(`The ${id} spotlight is already registered!`);
     }
     this._targetMap.set(id, target);
+  }
+
+  /**
+   * All registred directive ids
+   */
+  public getIdlist(): string[] {
+    return Array.from(this._targetMap.keys());
+  }
+
+  /**
+   * Get SpotlightDirective instance by id
+   * @param id - spotlight id
+   */
+  public getById(id: string): SpotlightDirective {
+    return this._targetMap.get(id);
   }
 
   /**
