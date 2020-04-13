@@ -16,14 +16,19 @@ import { fromEvent, merge, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
 import { SpotlightService } from './spotlight.service';
+import { getStyle } from './spotlight.util';
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 /** all 4 sides + overlay */
-type Piece = 'top' | 'bottom' | 'left' | 'right' | 'overlay';
-type Border = 'border-top' | 'border-bottom' | 'border-left' | 'border-right';
+export type Piece = 'top' | 'bottom' | 'left' | 'right' | 'overlay';
+export type Border =
+  | 'border-top'
+  | 'border-bottom'
+  | 'border-left'
+  | 'border-right';
 
 /**
  * Spotlight directive
@@ -40,19 +45,19 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   @Input('ngxSpotlight') id = 'spotlight_at_' + Date.now();
   /** draw border around spotlight element */
   @Input() border = false;
+  /** space around spotlight element */
+  @Input() indent = 0;
   /** draw transparent overlay on spotlight element */
   @Input() overlay = false;
   /** show overlay after view init */
   @Input() auto = false;
+  /** border width */
+  @Input() borderWidth = 4;
   /** backdrop and overlay click event */
   @Output() spotlightClick = new EventEmitter<{
     piece: Piece;
     mouse: MouseEvent;
   }>();
-  /** border width */
-  readonly borderWidth = 4;
-  /** gap around spotlight element */
-  readonly gap = 8;
   /** whether the directive is shown */
   private _isShown = false;
   /** whether the spotlight is shown */
@@ -212,76 +217,8 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    */
   private _modifyPieceStyle(el: HTMLElement, piece: Piece | Border): void {
     const rects = this.elementRef.nativeElement.getBoundingClientRect();
-    switch (piece) {
-      case 'top':
-        return this._setStyles(el, {
-          top: '0',
-          left: '0',
-          right: '0',
-          height: `${rects.top}px`,
-        });
-      case 'bottom':
-        return this._setStyles(el, {
-          top: `${rects.bottom}px`,
-          left: '0',
-          right: '0',
-          bottom: '0',
-        });
-      case 'left':
-        return this._setStyles(el, {
-          top: `${rects.top}px`,
-          left: '0',
-          width: `${rects.left}px`,
-          height: `${rects.height}px`,
-        });
-      case 'right':
-        return this._setStyles(el, {
-          top: `${rects.top}px`,
-          left: `${rects.right}px`,
-          right: '0',
-          height: `${rects.height}px`,
-        });
-      case 'overlay':
-        return this._setStyles(el, {
-          left: `${rects.left}px`,
-          top: `${rects.top}px`,
-          width: `${rects.width}px`,
-          height: `${rects.height}px`,
-          position: 'fixed',
-          zIndex: '990',
-        });
-      case 'border-top':
-        return this._setStyles(el, {
-          borderTopStyle: 'solid',
-          top: `${rects.top - this.borderWidth}px`,
-          left: `${rects.left - this.borderWidth}px`,
-          height: `${this.borderWidth}px`,
-          width: `${rects.width + 2 * this.borderWidth}px`,
-        });
-      case 'border-bottom':
-        return this._setStyles(el, {
-          top: `${rects.bottom - this.borderWidth}px`,
-          left: `${rects.left - this.borderWidth}px`,
-          height: `${this.borderWidth}px`,
-          width: `${rects.width + 2 * this.borderWidth}px`,
-        });
-      case 'border-left':
-        return this._setStyles(el, {
-          top: `${rects.top - this.borderWidth}px`,
-          left: `${rects.left - this.borderWidth}px`,
-          height: `${rects.height + 2 * this.borderWidth}px`,
-          width: `${this.borderWidth}px`,
-        });
-      case 'border-right':
-        return this._setStyles(el, {
-          top: `${rects.top - this.borderWidth}px`,
-          left: `${rects.right - this.borderWidth}px`,
-          height: `${rects.height + 2 * this.borderWidth}px`,
-          width: `${this.borderWidth}px`,
-        });
-      default:
-        throw new Error(`Unexpected piece ${piece}`);
-    }
+    const style = getStyle(rects, piece, this.borderWidth, this.indent);
+    this._setStyles(el, style);
   }
 
   /**
