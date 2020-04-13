@@ -23,7 +23,7 @@ function capitalize(value: string): string {
 }
 
 /** container + all 4 sides + overlay */
-export type SpotlightElement =
+export type SpotlightElementName =
   | 'container'
   | 'top'
   | 'bottom'
@@ -60,7 +60,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   @Input() borderWidth = 4;
   /** backdrop and overlay click event */
   @Output() spotlightClick = new EventEmitter<{
-    piece: SpotlightElement;
+    piece: SpotlightElementName;
     mouse: MouseEvent;
   }>();
   /** whether the directive is shown */
@@ -69,10 +69,14 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   get isShown(): boolean {
     return this._isShown;
   }
+  /** main spotlight container */
+  get container(): HTMLElement {
+    return this._elementMap.get('container');
+  }
   /** destroy subject (pattern) */
   private readonly _destroy$ = new Subject<void>();
   /** set of all created corresponding elements (backdrops, borders and overlay) */
-  private readonly _elementMap = new Map<SpotlightElement, HTMLElement>();
+  private readonly _elementMap = new Map<SpotlightElementName, HTMLElement>();
   /**
    * Set of listeners that should be "unlistened" on destroying
    * @see https://angular.io/api/core/Renderer2#listen
@@ -96,7 +100,6 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
 
   /**
    * Shows the overlay
-   * - Locks the scrolling for the user
    * - Scrolls the page to the very top
    * - Places 4 overlays around the element
    */
@@ -104,7 +107,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
     if (this._isShown) {
       return;
     }
-    this._scrollToTop();
+    this._drawContainer();
     this._drawBackdrop();
     if (this.border) {
       this._drawBorder();
@@ -117,20 +120,34 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Scrolls the window to the top
+   * Places container to document body
    */
-  private _scrollToTop(): void {
-    this._window.scrollTo({
-      left: 0,
-      top: 0,
+  private _drawContainer(): void {
+    const container: HTMLElement = this._renderer.createElement('div');
+    this._renderer.addClass(container, 'spotlight__container'); // just for show class
+    this._setStyles(container, {
+      position: 'absolute',
+      zIndex: '940',
+      left: '0px',
+      top: '0px',
+      right: '0px',
+      bottom: '0px',
+      pointerEvents: 'none',
     });
+    this._elementMap.set('container', container);
+    this._renderer.appendChild(this._window.document.body, container);
   }
 
   /**
    * Places 4 backdrops around the elementRef
    */
   private _drawBackdrop(): void {
-    for (const side of ['top', 'bottom', 'left', 'right'] as SpotlightElement[]) {
+    for (const side of [
+      'top',
+      'bottom',
+      'left',
+      'right',
+    ] as SpotlightElementName[]) {
       const backdropEl: HTMLElement = this._renderer.createElement('div');
       this._renderer.addClass(backdropEl, 'spotlight__backdrop'); // just for show class
       this._renderer.addClass(backdropEl, `spotlight__backdrop_${side}`); // just for show class
@@ -151,7 +168,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
         })
       );
       this._elementMap.set(side, backdropEl);
-      this._renderer.appendChild(this._window.document.body, backdropEl);
+      this._renderer.appendChild(this.container, backdropEl);
     }
   }
 
@@ -159,8 +176,13 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * Places 4 div around the spotlight to emulate stroke
    */
   private _drawBorder(): void {
-    for (const side of ['top', 'bottom', 'left', 'right'] as SpotlightElement[]) {
-      const border = `border-${side}` as SpotlightElement;
+    for (const side of [
+      'top',
+      'bottom',
+      'left',
+      'right',
+    ] as SpotlightElementName[]) {
+      const border = `border-${side}` as SpotlightElementName;
       const borderEl: HTMLElement = this._renderer.createElement('div');
       this._renderer.addClass(borderEl, 'spotlight__border'); // just for show class
       this._renderer.addClass(borderEl, `spotlight__border_${side}`); // just for show class
@@ -179,7 +201,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
       });
       this._modifyPieceStyle(borderEl, border);
       this._elementMap.set(border, borderEl);
-      this._renderer.appendChild(this._window.document.body, borderEl);
+      this._renderer.appendChild(this.container, borderEl);
     }
   }
 
@@ -220,10 +242,12 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * @param el - backdrop's layer HTML element
    * @param piece - piece of spotlight element
    */
-  private _modifyPieceStyle(el: HTMLElement, piece: SpotlightElement): void {
-    const rects = this.elementRef.nativeElement.getBoundingClientRect();
-    const style = getStyle(rects, piece, this.borderWidth, this.indent);
-    this._setStyles(el, style);
+  private _modifyPieceStyle(el: HTMLElement, piece: SpotlightElementName): void {
+    if (piece !== 'container') {
+      const rects = this.elementRef.nativeElement.getBoundingClientRect();
+      const style = getStyle(rects, piece, this.borderWidth, this.indent);
+      this._setStyles(el, style);
+    }
   }
 
   /**
@@ -253,7 +277,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
     if (!this._isShown) {
       return;
     }
-    this._removeBackdropAndOverlay();
+    this._removeElements();
     this._destroy$.next();
     this._isShown = false;
   }
@@ -261,7 +285,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   /**
    * Removes the backdrop and the overlay elements from the DOM
    */
-  private _removeBackdropAndOverlay(): void {
+  private _removeElements(): void {
     for (const removeListener of this._listenerSet) {
       removeListener();
     }

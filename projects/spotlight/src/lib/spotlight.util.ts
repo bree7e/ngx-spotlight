@@ -1,4 +1,4 @@
-import { SpotlightElement } from './spotlight.directive';
+import { SpotlightElementName } from './spotlight.directive';
 
 /**
  * Modifies the given layer's styles **by mutating it**
@@ -7,7 +7,7 @@ import { SpotlightElement } from './spotlight.directive';
  */
 export function getStyle(
   rects: DOMRect,
-  piece: SpotlightElement,
+  piece: SpotlightElementName,
   borderWidth: number,
   indent: number
 ): Partial<CSSStyleDeclaration> {
