@@ -16,19 +16,15 @@ import { fromEvent, merge, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
 import { SpotlightService } from './spotlight.service';
-import { getStyle } from './spotlight.util';
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
+import { capitalize, getStyle } from './spotlight.util';
 
 /** container + all 4 sides + overlay */
 export type SpotlightElementName =
   | 'container'
-  | 'top'
-  | 'bottom'
-  | 'left'
-  | 'right'
+  | 'backdrop-top'
+  | 'backdrop-bottom'
+  | 'backdrop-left'
+  | 'backdrop-right'
   | 'overlay'
   | 'border-top'
   | 'border-bottom'
@@ -142,12 +138,8 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * Places 4 backdrops around the elementRef
    */
   private _drawBackdrop(): void {
-    for (const side of [
-      'top',
-      'bottom',
-      'left',
-      'right',
-    ] as SpotlightElementName[]) {
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      const backdrop = `backdrop-${side}` as SpotlightElementName;
       const backdropEl: HTMLElement = this._renderer.createElement('div');
       this._renderer.addClass(backdropEl, 'spotlight__backdrop'); // just for show class
       this._renderer.addClass(backdropEl, `spotlight__backdrop_${side}`); // just for show class
@@ -160,14 +152,14 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
           rgba(52, 74, 94, 0.8)
         )`,
       });
-      this._modifyPieceStyle(backdropEl, side);
+      this._modifyPieceStyle(backdropEl, backdrop);
       this._listenerSet.add(
         this._renderer.listen(backdropEl, 'click', (event: MouseEvent) => {
           event.preventDefault();
-          this.spotlightClick.emit({ piece: side, mouse: event });
+          this.spotlightClick.emit({ piece: backdrop, mouse: event });
         })
       );
-      this._elementMap.set(side, backdropEl);
+      this._elementMap.set(backdrop, backdropEl);
       this._renderer.appendChild(this.container, backdropEl);
     }
   }
@@ -176,12 +168,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * Places 4 div around the spotlight to emulate stroke
    */
   private _drawBorder(): void {
-    for (const side of [
-      'top',
-      'bottom',
-      'left',
-      'right',
-    ] as SpotlightElementName[]) {
+    for (const side of ['top', 'bottom', 'left', 'right']) {
       const border = `border-${side}` as SpotlightElementName;
       const borderEl: HTMLElement = this._renderer.createElement('div');
       this._renderer.addClass(borderEl, 'spotlight__border'); // just for show class
@@ -209,7 +196,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * Watches for window scroll&resize and, when it occurs, modifies the layers styles
    */
   private _watchWindowUpdate(): void {
-    const updateBackropAndOverlay = () => {
+    const updateHtmlElements = () => {
       for (const [piece, layer] of this._elementMap) {
         this._modifyPieceStyle(layer, piece);
       }
@@ -217,7 +204,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
     this._zone.runOutsideAngular(() => {
       merge(fromEvent(window, 'scroll'), fromEvent(window, 'resize'))
         .pipe(takeUntil(this._destroy$))
-        .subscribe(() => updateBackropAndOverlay());
+        .subscribe(() => updateHtmlElements());
     });
   }
 
@@ -242,7 +229,10 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * @param el - backdrop's layer HTML element
    * @param piece - piece of spotlight element
    */
-  private _modifyPieceStyle(el: HTMLElement, piece: SpotlightElementName): void {
+  private _modifyPieceStyle(
+    el: HTMLElement,
+    piece: SpotlightElementName
+  ): void {
     if (piece !== 'container') {
       const rects = this.elementRef.nativeElement.getBoundingClientRect();
       const style = getStyle(rects, piece, this.borderWidth, this.indent);

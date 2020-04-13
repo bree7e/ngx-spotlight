@@ -1,5 +1,9 @@
 import { SpotlightElementName } from './spotlight.directive';
 
+export function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 /**
  * Modifies the given layer's styles **by mutating it**
  * @param el - backdrop's layer HTML element
@@ -19,28 +23,28 @@ export function getStyle(
   const height = rects.height + 2 * indent;
 
   switch (piece) {
-    case 'top':
+    case 'backdrop-top':
       return {
         top: '0',
         left: '0',
         right: '0',
         height: `${top}px`,
       };
-    case 'bottom':
+    case 'backdrop-bottom':
       return {
         top: `${bottom}px`,
         left: '0',
         right: '0',
         bottom: '0',
       };
-    case 'left':
+    case 'backdrop-left':
       return {
         top: `${top}px`,
         left: '0',
         width: `${left}px`,
         height: `${height}px`,
       };
-    case 'right':
+    case 'backdrop-right':
       return {
         top: `${top}px`,
         left: `${right}px`,
@@ -86,6 +90,6 @@ export function getStyle(
         width: `${borderWidth}px`,
       };
     default:
-      throw new Error(`Unexpected piece ${piece}`);
+      throw new Error(`Unexpected element ${piece}`);
   }
 }
