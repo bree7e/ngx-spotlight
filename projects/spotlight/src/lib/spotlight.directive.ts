@@ -22,9 +22,14 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/** all 4 sides + overlay */
-export type Piece = 'top' | 'bottom' | 'left' | 'right' | 'overlay';
-export type Border =
+/** container + all 4 sides + overlay */
+export type SpotlightElement =
+  | 'container'
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'overlay'
   | 'border-top'
   | 'border-bottom'
   | 'border-left'
@@ -55,7 +60,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   @Input() borderWidth = 4;
   /** backdrop and overlay click event */
   @Output() spotlightClick = new EventEmitter<{
-    piece: Piece;
+    piece: SpotlightElement;
     mouse: MouseEvent;
   }>();
   /** whether the directive is shown */
@@ -67,7 +72,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   /** destroy subject (pattern) */
   private readonly _destroy$ = new Subject<void>();
   /** set of all created corresponding elements (backdrops, borders and overlay) */
-  private readonly _elementMap = new Map<Piece | Border, HTMLElement>();
+  private readonly _elementMap = new Map<SpotlightElement, HTMLElement>();
   /**
    * Set of listeners that should be "unlistened" on destroying
    * @see https://angular.io/api/core/Renderer2#listen
@@ -125,7 +130,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * Places 4 backdrops around the elementRef
    */
   private _drawBackdrop(): void {
-    for (const side of ['top', 'bottom', 'left', 'right'] as Piece[]) {
+    for (const side of ['top', 'bottom', 'left', 'right'] as SpotlightElement[]) {
       const backdropEl: HTMLElement = this._renderer.createElement('div');
       this._renderer.addClass(backdropEl, 'spotlight__backdrop'); // just for show class
       this._renderer.addClass(backdropEl, `spotlight__backdrop_${side}`); // just for show class
@@ -154,8 +159,8 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * Places 4 div around the spotlight to emulate stroke
    */
   private _drawBorder(): void {
-    for (const side of ['top', 'bottom', 'left', 'right'] as Piece[]) {
-      const border = `border-${side}` as Border;
+    for (const side of ['top', 'bottom', 'left', 'right'] as SpotlightElement[]) {
+      const border = `border-${side}` as SpotlightElement;
       const borderEl: HTMLElement = this._renderer.createElement('div');
       this._renderer.addClass(borderEl, 'spotlight__border'); // just for show class
       this._renderer.addClass(borderEl, `spotlight__border_${side}`); // just for show class
@@ -215,7 +220,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * @param el - backdrop's layer HTML element
    * @param piece - piece of spotlight element
    */
-  private _modifyPieceStyle(el: HTMLElement, piece: Piece | Border): void {
+  private _modifyPieceStyle(el: HTMLElement, piece: SpotlightElement): void {
     const rects = this.elementRef.nativeElement.getBoundingClientRect();
     const style = getStyle(rects, piece, this.borderWidth, this.indent);
     this._setStyles(el, style);
