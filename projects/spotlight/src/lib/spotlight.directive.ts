@@ -78,14 +78,18 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
    * @see https://angular.io/api/core/Renderer2#listen
    */
   private _listenerSet = new Set<() => void>();
+  /** global window */
+  private _window: Window;
 
   constructor(
     private _spotlightService: SpotlightService,
-    @Inject(WINDOW) private _window: Window,
+    @Inject(WINDOW) _window: any,
     public readonly elementRef: ElementRef<HTMLElement>,
     private _renderer: Renderer2,
     private _zone: NgZone
-  ) {}
+  ) {
+    this._window = _window;
+  }
 
   ngAfterViewInit(): void {
     this._spotlightService.register(this.id, this);
