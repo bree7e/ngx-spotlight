@@ -42,7 +42,7 @@ export type SpotlightElementName =
   exportAs: 'spotlight',
 })
 export class SpotlightDirective implements AfterViewInit, OnDestroy {
-  /** onboarding tip id */
+  /** spotlight id */
   @Input('ngxSpotlight') id = 'spotlight_at_' + Date.now();
   /** draw border around spotlight element */
   @Input() border = false;
@@ -50,7 +50,7 @@ export class SpotlightDirective implements AfterViewInit, OnDestroy {
   @Input() indent = 0;
   /** draw transparent overlay on spotlight element */
   @Input() overlay = false;
-  /** show overlay after view init */
+  /** highlight element after view init */
   @Input() auto = false;
   /** border width */
   @Input() borderWidth = 4;
