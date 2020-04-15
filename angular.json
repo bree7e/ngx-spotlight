@@ -165,7 +165,7 @@
         "deploy": {
           "builder": "angular-cli-ghpages:deploy",
           "options": {
-            "baseHref": "https://github.com/bree7e/ngx-spotlight/",
+            "baseHref": "https://bree7e.github.io/ngx-spotlight/",
             "name": "Ngx Spotlight Demo"
           }
         }
