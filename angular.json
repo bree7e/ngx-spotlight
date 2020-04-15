@@ -161,9 +161,17 @@
               "devServerTarget": "demo:serve:production"
             }
           }
+        },
+        "deploy": {
+          "builder": "angular-cli-ghpages:deploy",
+          "options": {
+            "baseHref": "https://github.com/bree7e/ngx-spotlight/",
+            "name": "Ngx Spotlight Demo"
+          }
         }
       }
-    }},
+    }
+  },
   "cli": {
     "analytics": "406f9a36-e4d2-4855-ba7b-e853e7a29762"
   },
